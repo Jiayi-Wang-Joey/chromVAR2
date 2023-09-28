@@ -15,7 +15,7 @@ output:
 ---
 
 ## Dependencies
-```{r set up}
+```{r set up, message=FALSE, warning=FALSE}
 suppressPackageStartupMessages({
     library(chromVAR)
     library(motifmatchr)
@@ -157,7 +157,7 @@ lfc <- do.call(rbind, lfc)
 ### Histogram
 ```{r lfc histo, fig.height=6, fig.width=12}
 ggplot(lfc, aes(x = logFC, col = method)) + 
-    geom_histogram(aes(y = ..density..),      
+    geom_histogram(aes(y = after_stat(density)),      
         fill = "white",
         bins = 30,
         alpha = 0.2) +
