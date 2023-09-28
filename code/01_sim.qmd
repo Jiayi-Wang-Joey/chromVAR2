@@ -1,0 +1,176 @@
+---
+title: "Improvement of chromVAR by normalization - simulated data"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-tools: true
+    toc_float: true
+---
+
+## Dependencies
+```{r set up}
+suppressPackageStartupMessages({
+    library(chromVAR)
+    library(motifmatchr)
+    library(Matrix)
+    library(SummarizedExperiment)
+    library(BiocParallel)
+    library(BSgenome.Hsapiens.UCSC.hg38)
+    library(ggplot2)
+    library(JASPAR2016)
+    library(pheatmap)
+    library(patchwork)
+    library(limma)
+    library(stringr)
+    source("utils.R")
+})
+set.seed(2017)
+
+```
+
+## Load simulated data
+```{r data}
+files <- list.files("../data", "*CEBPB.rds", full.names = TRUE)
+sims <- lapply(files, readRDS)
+names(sims) <- c("0", "025", "05", "1", "3")
+```
+
+## Standard chromVAR workflow deviations
+```{r chromVAR sim}
+motifs <- getJasparMotifs()
+# old_devs <- lapply(sims, .chromVAR_bulk, motifs)
+# names(old_devs) <- names(sims)
+# saveRDS(old_devs, "../result/01_sim/old_devs.rds")
+old_devs <- readRDS("../result/01_sim/old_devs.rds")
+```
+
+```{r visualization of devs}
+# lapply(names(sim_devs), \(x) {
+#     dev <- sim_devs[[x]]
+#     as.ggplot(pheatmap(deviations(dev))) + ggtitle(x)
+# }) |> 
+#   wrap_plots(ncol = 3) +  plot_layout(guides = "collect")
+```
+
+```{r limma, message = FALSE}
+old_res <- lapply(old_devs, \(dev) {
+    colData(dev)$group_id <- substr(colnames(dev), 1, nchar(colnames(dev)) - 5)
+    design <- model.matrix(~ dev$group_id)
+    fit <- eBayes(lmFit(assays(dev)$z, design))
+    res <- topTable(fit, n = Inf)
+    ids <- match(rownames(res), rownames(dev))
+    res$name <- rowData(dev)$name[ids]
+    res$rank <- rank(res$P.Value)
+    res
+})
+names(old_res) <- names(old_devs)
+#saveRDS(res, "../result/01_sim/old_limma.rds")
+old_res <- readRDS("../result/01_sim/old_limma.rds")
+old_rank <- lapply(names(old_res), \(e) {
+    x <- old_res[[e]]
+    r <- x[str_detect(rownames(x),  "CEBPB"),"rank"]
+    data.frame(rank = r, effect = e, method = "old")
+}) 
+old_rank <- do.call(rbind, old_rank)
+```
+
+
+## edgeR TMM normalization 
+```{r new normalization, message = FALSE}
+devtools::load_all("../../ATAC-seq/chromVAR/")
+source("utils.R")
+# new_devs <- lapply(sims, .chromVAR_bulk, motifs)
+# names(new_devs) <- names(sims)
+# saveRDS(new_devs, "../result/01_sim/new_devs.rds")
+new_devs <- readRDS("../result/01_sim/new_devs.rds")
+new_res <- lapply(new_devs, \(dev) {
+    colData(dev)$group_id <- substr(colnames(dev), 1, nchar(colnames(dev)) - 5)
+    design <- model.matrix(~ dev$group_id)
+    fit <- eBayes(lmFit(assays(dev)$z, design))
+    res <- topTable(fit, n = Inf)
+    ids <- match(rownames(res), rownames(dev))
+    res$name <- rowData(dev)$name[ids]
+    res$rank <- rank(res$P.Value)
+    res
+})
+names(new_res) <- names(new_devs)
+```
+
+## Comparisons of results before and after the TMM normalization
+
+### Rank of CEBPB
+```{r rank, message = FALSE}
+new_rank <- lapply(names(new_res), \(e) {
+    x <- new_res[[e]]
+    r <- x[str_detect(rownames(x),  "CEBPB"),"rank"]
+    data.frame(rank = r, effect = e, method = "new")
+}) 
+new_rank <- do.call(rbind, new_rank)
+rank <- rbind(new_rank, old_rank)
+
+ggplot(rank, aes(x = effect, y = rank, group = method, 
+    label = rank, color = method)) +
+    geom_line(linetype = "dashed") + 
+    geom_point() + 
+    geom_label(fill = "white", alpha = 0.4)
+```
+
+### Distribution of z-scores
+
+::: {.panel-tabset}
+
+### Old: standard chromVAR
+```{r z-dist old, fig.height=8, fig.width=10}
+lapply(names(old_devs), \(x) {
+    dev <- old_devs[[x]]
+    ggplot(sechm::meltSE(dev, row.names(dev)), aes(z, colour = sample)) +
+        geom_density() + ggtitle(paste0("Effect: ", x))
+})  |>  wrap_plots(ncol = 2) +  plot_layout(guides = "collect")
+
+```
+
+### New: TMM normalization
+```{r z-dist new, fig.height=8, fig.width=10}
+lapply(names(new_devs), \(x) {
+    dev <- new_devs[[x]]
+    ggplot(sechm::meltSE(dev, row.names(dev)), aes(z, colour = sample)) +
+        geom_density() + ggtitle(paste0(
+            "Effect: ", x))
+})  |>  wrap_plots(ncol = 2) +  plot_layout(guides = "collect")
+
+```
+
+:::
+
+### logFC of limma results
+
+```{r lfc, fig.height=6, fig.width=12}
+lfc <- lapply(names(old_res), \(x) {
+    old <- data.frame(old_res[[x]], effect = x, method = "old")
+    new <- data.frame(new_res[[x]], effect = x, method = "new")
+    rbind(old, new)
+})
+lfc <- do.call(rbind, lfc)
+```
+
+::: {.panel-tabset}
+### Histogram
+```{r lfc histo, fig.height=6, fig.width=12}
+ggplot(lfc, aes(x = logFC, col = method)) + 
+    geom_histogram(aes(y = ..density..),      
+        fill = "white",
+        bins = 30,
+        alpha = 0.2) +
+    geom_density() + 
+    facet_grid(method ~ effect)
+```
+
+### Violin plot
+```{r}
+ggplot(lfc, aes(x = factor(effect), y = logFC, fill = method)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot(width = 0.2, position = position_dodge(0.9), alpha = 0.4)
+```
+
+::: 
