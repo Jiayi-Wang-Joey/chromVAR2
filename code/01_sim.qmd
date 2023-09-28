@@ -1,11 +1,17 @@
 ---
-title: "Improvement of chromVAR by normalization - simulated data"
+title: "Improvement of chromVAR by TMM normalization - simulated data"
+author: "Jiayi Wang"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
 format:
   html:
     toc: true
     code-fold: true
     code-tools: true
     toc_float: true
+
+output:
+  quarto::quarto_html:
+    output_dir: "../docs/"
 ---
 
 ## Dependencies
@@ -45,27 +51,20 @@ motifs <- getJasparMotifs()
 old_devs <- readRDS("../result/01_sim/old_devs.rds")
 ```
 
-```{r visualization of devs}
-# lapply(names(sim_devs), \(x) {
-#     dev <- sim_devs[[x]]
-#     as.ggplot(pheatmap(deviations(dev))) + ggtitle(x)
-# }) |> 
-#   wrap_plots(ncol = 3) +  plot_layout(guides = "collect")
-```
 
 ```{r limma, message = FALSE}
-old_res <- lapply(old_devs, \(dev) {
-    colData(dev)$group_id <- substr(colnames(dev), 1, nchar(colnames(dev)) - 5)
-    design <- model.matrix(~ dev$group_id)
-    fit <- eBayes(lmFit(assays(dev)$z, design))
-    res <- topTable(fit, n = Inf)
-    ids <- match(rownames(res), rownames(dev))
-    res$name <- rowData(dev)$name[ids]
-    res$rank <- rank(res$P.Value)
-    res
-})
-names(old_res) <- names(old_devs)
-#saveRDS(res, "../result/01_sim/old_limma.rds")
+# old_res <- lapply(old_devs, \(dev) {
+#     colData(dev)$group_id <- substr(colnames(dev), 1, nchar(colnames(dev)) - 5)
+#     design <- model.matrix(~ dev$group_id)
+#     fit <- eBayes(lmFit(assays(dev)$z, design))
+#     res <- topTable(fit, n = Inf)
+#     ids <- match(rownames(res), rownames(dev))
+#     res$name <- rowData(dev)$name[ids]
+#     res$rank <- rank(res$P.Value)
+#     res
+# })
+# names(old_res) <- names(old_devs)
+# saveRDS(old_res, "../result/01_sim/old_limma.rds")
 old_res <- readRDS("../result/01_sim/old_limma.rds")
 old_rank <- lapply(names(old_res), \(e) {
     x <- old_res[[e]]
@@ -78,8 +77,8 @@ old_rank <- do.call(rbind, old_rank)
 
 ## edgeR TMM normalization 
 ```{r new normalization, message = FALSE}
-devtools::load_all("../../ATAC-seq/chromVAR/")
-source("utils.R")
+#devtools::load_all("../../chromVAR/")
+#source("utils.R")
 # new_devs <- lapply(sims, .chromVAR_bulk, motifs)
 # names(new_devs) <- names(sims)
 # saveRDS(new_devs, "../result/01_sim/new_devs.rds")
@@ -167,7 +166,7 @@ ggplot(lfc, aes(x = logFC, col = method)) +
 ```
 
 ### Violin plot
-```{r}
+```{r violin}
 ggplot(lfc, aes(x = factor(effect), y = logFC, fill = method)) +
   geom_violin(alpha = 0.5) +
   geom_boxplot(width = 0.2, position = position_dodge(0.9), alpha = 0.4)
