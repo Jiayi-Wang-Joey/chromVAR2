@@ -30,6 +30,8 @@ suppressPackageStartupMessages({
     library(limma)
     library(stringr)
     library(data.table)
+    library(ggpubr)
+    library(csaw)
     source("utils.R")
 })
 set.seed(2017)
@@ -39,8 +41,16 @@ set.seed(2017)
 ## Load simulated data
 ```{r data}
 files <- list.files("../data/01_sim", "*CEBPB.rds", full.names = TRUE)
-sims <- lapply(files, readRDS)
+sims <- lapply(files, \(.) {
+  x <- readRDS(.)
+  x$totals <- colSums(counts(x))
+  x <- normOffsets(x)
+  assay(x, "ori_counts") <- assay(x, "counts")
+  assay(x, "counts") <- assay(x, "offset")
+  x
+})
 names(sims) <- c("0", "025", "05", "1", "3")
+
 ```
 
 
@@ -60,6 +70,7 @@ old_devs <- readRDS("../result/01_sim/old_devs.rds")
 
 ### Differential analysis of deviations between conditions
 ```{r limma, message = FALSE}
+
 old_res <- lapply(old_devs, \(dev) {
     colData(dev)$group_id <- substr(colnames(dev), 1, nchar(colnames(dev)) - 5)
     design <- model.matrix(~ dev$group_id)
@@ -71,8 +82,6 @@ old_res <- lapply(old_devs, \(dev) {
     res
 })
 names(old_res) <- names(old_devs)
-saveRDS(old_res, "../result/01_sim/old_limma.rds")
-old_res <- readRDS("../result/01_sim/old_limma.rds")
 ```
 
 
@@ -127,8 +136,8 @@ old_rank <- do.call(rbind, old_rank)
 
 rank <- rbind(new_rank, old_rank)
 
-ggplot(rank, aes(x = effect, y = rank, group = method,
-    label = rank, color = method)) +
+ggplot(rank, aes(x = effect, y = sqrt(rank), group = method,
+    label = sqrt(rank), color = method)) +
     geom_line(linetype = "dashed") +
     geom_point() +
     geom_label(fill = "white", alpha = 0.4) + 
@@ -152,7 +161,7 @@ lapply(names(old_devs), \(x) {
 ```
 
 ### New: TMM normalization
-```{r z-dist new, fig.height=8, fig.width=10}
+```{r z-dist new, fig.height=15, fig.width=10}
 lapply(names(new_devs), \(x) {
     dev <- new_devs[[x]]
     df <- sechm::meltSE(dev, row.names(dev))
@@ -208,7 +217,7 @@ ggplot(lfc, aes(x = P.Value, col = chip)) +
 
 ### Violin plot
 ```{r}
-devDF <- lapply(names(old_devs), \(x) {
+lfc <- lapply(names(old_res), \(x) {
     new <- data.frame(new_res[[x]],  method = "new")
     old <- data.frame(old_res[[x]],  method = "old")
     new$chip <- addChIP(rownames(new))
@@ -217,11 +226,11 @@ devDF <- lapply(names(old_devs), \(x) {
     df$effect <- x
     df
 }) 
-devDF <- do.call(rbind, devDF)
+lfc <- do.call(rbind, lfc)
 ```
 
 ```{r violin, fig.height=8, fig.width=10}
-ggplot(devDF, aes(x = factor(chip), y = logFC, fill = method)) +
+ggplot(lfc, aes(x = factor(chip), y = logFC, fill = method)) +
   geom_violin(alpha = 0.5) +
   geom_boxplot(width = 0.2, position = position_dodge(0.9), alpha = 0.4) +
   scale_fill_brewer(palette = "Blues") +
@@ -229,16 +238,42 @@ ggplot(devDF, aes(x = factor(chip), y = logFC, fill = method)) +
   xlab("ChIP-seq overlaps")
 ```
 
-```{r boxplot2, fig.height=8, fig.width=10}
-ggplot(devDF, aes(x = factor(method), y = logFC, fill = chip)) +
-  geom_violin(alpha = 0.5) +
-  geom_boxplot(width = 0.2, position = position_dodge(0.9), alpha = 0.4) +
-  scale_fill_brewer(palette = "Blues") +
-  facet_wrap(~ effect, ncol = 3, labeller = \(.) label_both(.), scales="free") +
-  xlab("New or old method")
+### MA plot
+
+
+::: {.panel-tabset}
+### old
+```{r ma, fig.height=10, fig.width=15}
+colnames(lfc)[c(1,2,5)] <- c("log2FoldChange", "baseMeanLog2", "padj")
+nlfc <- lfc[lfc$method == "new",]
+olfc <- lfc[lfc$method == "old",]
+lapply(unique(nlfc$effect), \(x) {
+  df <- nlfc[nlfc$effect == x,]
+  ggmaplot(df, dr = 0.05, fc = 2, size = 0.4,
+     palette = c("#B31B21", "#1465AC", "darkgray"),
+     genenames = as.vector(df$name),
+     legend = "top", top = 20,
+     font.label = c("bold", 11),
+     font.legend = "bold",
+     font.main = "bold",
+     ggtheme = ggplot2::theme_minimal()) + ggtitle(paste0("Effect: ", x))
+})  |>  wrap_plots(ncol = 3) 
+```
+### new
+```{r ma new, fig.height=10, fig.width=15} 
+lapply(unique(olfc$effect), \(x) {
+  df <- olfc[olfc$effect == x,]
+  ggmaplot(df, dr = 0.05, fc = 2, size = 0.4,
+     palette = c("#B31B21", "#1465AC", "darkgray"),
+     genenames = as.vector(df$name),
+     legend = "top", top = 20,
+     font.label = c("bold", 11),
+     font.legend = "bold",
+     font.main = "bold",
+     ggtheme = ggplot2::theme_minimal()) + ggtitle(paste0("Effect: ", x))
+})  |>  wrap_plots(ncol = 3) 
 ```
 
-
-
+:::
 
 

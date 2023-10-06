@@ -49,3 +49,8 @@ rsconnect/
 chromVAR/
 data/*
 result/*
+.RData
+.Rhistory
+.DS_Store
+._.DS_Store
+code/.*
