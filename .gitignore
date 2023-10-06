@@ -40,10 +40,17 @@ vignettes/*.pdf
 .Renviron
 
 # pkgdown site
-docs/
 
 # translation temp files
 po/*~
 
 # RStudio Connect folder
 rsconnect/
+chromVAR/
+data/*
+result/*
+.RData
+.Rhistory
+.DS_Store
+._.DS_Store
+code/.*
