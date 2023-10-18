@@ -1,0 +1,124 @@
+---
+title: "Exploratory analysis on background peaks"
+author: "Jiayi Wang"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-tools: true
+    toc_float: true
+
+output:
+  quarto::quarto_html:
+    output_dir: "../docs/"
+---
+
+## Dependencies
+```{r set up, message=FALSE, warning=FALSE}
+suppressPackageStartupMessages({
+    library(chromVAR)
+    library(motifmatchr)
+    library(Matrix)
+    library(SummarizedExperiment)
+    library(BiocParallel)
+    library(BSgenome.Hsapiens.UCSC.hg38)
+    library(ggplot2)
+    library(JASPAR2016)
+    library(pheatmap)
+    library(patchwork)
+    library(limma)
+    library(stringr)
+    library(data.table)
+    library(ggpubr)
+    library(csaw)
+    source("../utils.R")
+})
+set.seed(2017)
+
+```
+
+## Loading data
+```{r data, message=FALSE, warning=FALSE}
+files <- list.files("../../data/01_sim", "*CEBPB.rds", full.names = TRUE)
+sims <- lapply(files, readRDS)
+names(sims) <- c("0", "025", "05", "1", "3")
+dat <- sims[["3"]]
+```
+
+## Investigate the influence of bin size parameters
+```{r bin size, message=FALSE, warning=FALSE}
+motifs <- getNonRedundantMotifs(format = "PFMatrix", species = "Hsapiens")
+# bs <- c(10, 30, 50, 70, 90, 110)
+# bsRes <- lapply(bs, \(b) {
+#     x <- filterPeaks(dat, non_overlapping = TRUE)
+#     x <- addGCBias(x, 
+#         genome = BSgenome.Hsapiens.UCSC.hg38)
+#     bg <- getBackgroundPeaks(object = x, niterations = 1000, bs = b)
+#     motif_ix <- matchMotifs(motifs, x, 
+#         genome = BSgenome.Hsapiens.UCSC.hg38)
+#     motif_ix <- addAnnotations(motif_ix)
+#     dev <- computeDeviations(object = x, 
+#         annotations = motif_ix,
+#         background_peaks = bg
+#         )
+# })
+# names(bsRes) <- as.character(bs)
+# saveRDS(bsRes, "../../result/01_sim/bsRes.rds")
+bsRes <- readRDS("../../result/01_sim/bsRes.rds")
+```
+
+## Investigate the influence of w 
+```{r}
+w <- c(0.001, 0.01, 0.05, 0.1, 0.3)
+wRes <- lapply(w, \(wi) {
+    x <- filterPeaks(dat, non_overlapping = TRUE)
+    x <- addGCBias(x,
+        genome =  BSgenome.Hsapiens.UCSC.hg38)
+    bg <- getBackgroundPeaks(object = x, niterations = 1000, w = wi)
+    motif_ix <- matchMotifs(motifs,
+        x,
+        genome =  BSgenome.Hsapiens.UCSC.hg38)
+    motif_ix <- addAnnotations(motif_ix)
+    dev <- computeDeviations(object = x,
+        annotations = motif_ix,
+        background_peaks = bg
+        )
+})
+names(wRes) <- as.character(w)
+saveRDS(wRes, "../../result/01_sim/wRes.rds")
+wRes <- readRDS("../../result/01_sim/wRes.rds")
+```
+
+## Visualization
+
+::: {.panel-tabset}
+### bin size
+```{r bsRes, fig.height=15, fig.width=10}
+lapply(names(bsRes), \(x) {
+    dev <- bsRes[[x]]
+    df <- sechm::meltSE(dev, row.names(dev))
+    df$chip <- addChIP(df$feature)
+    ggplot(df, aes(z, colour = sample)) +
+        geom_density() + ggtitle(paste0("bin size: ", x)) + 
+        facet_grid(~ chip)
+})  |>  wrap_plots(ncol = 1) +  plot_layout(guides = "collect")
+```
+
+### similarity w
+```{r wRes, fig.height=15, fig.width=10}
+lapply(names(wRes), \(x) {
+    dev <- wRes[[x]]
+    df <- sechm::meltSE(dev, row.names(dev))
+    df$chip <- addChIP(df$feature)
+    ggplot(df, aes(z, colour = sample)) +
+        geom_density() + ggtitle(paste0("similarity: ", x)) + 
+        facet_grid(~ chip)
+})  |>  wrap_plots(ncol = 1) +  plot_layout(guides = "collect")
+```
+
+
+
+
+::: 
+
