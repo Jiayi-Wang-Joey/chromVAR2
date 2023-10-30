@@ -42,19 +42,22 @@ files <- list.files("../data/02_dat", "*.rds", full.names = TRUE)
 dat <- lapply(files, readRDS)
 name <- unlist(lapply(files, 
     \(.) substr(basename(.), 1, nchar(basename(.)) - 4)))
+name[name == "NR3C1"] <- "GCR"
 names(dat) <- name
 ```
 
 ## Standard chromVAR workflow
 
-### Get deviations
+### Deviations on original data
 ```{r chromVAR, warning=FALSE}
+# get motifs
 Hmotifs <- getNonRedundantMotifs(format = "PFMatrix", species = "Hsapiens") 
 Mmotifs <- getNonRedundantMotifs(format = "PFMatrix", species = "Mmusculus")
+
+# # run chromVAR
 # old_devs <- lapply(names(dat), \(x) {
 #   d <- dat[[x]]
-#   seqlevelsStyle(d) <- "UCSC" 
-#   message(x)
+#   seqlevelsStyle(d) <- "UCSC"
 #   tryCatch(
 #   {
 #     .chromVAR_bulk(d, Hmotifs, BSgenome.Hsapiens.UCSC.hg38)
@@ -70,41 +73,73 @@ Mmotifs <- getNonRedundantMotifs(format = "PFMatrix", species = "Mmusculus")
 old_devs <- readRDS("../result/02_dat/old_devs.rds")
 ```
 
-### Differential analysis of deviations between conditions
-```{r limma, message=FALSE, warning=FALSE}
-# old_limma <- lapply(old_devs, \(dev) {
-#     colData(dev)$group_id <- substr(colnames(dev), 1, nchar(colnames(dev)) - 5)
-#     design <- model.matrix(~ dev$group_id)
-#     fit <- eBayes(lmFit(assays(dev)$z, design))
-#     res <- topTable(fit, n = Inf)
-#     ids <- match(rownames(res), rownames(dev))
-#     res$name <- rowData(dev)$name[ids]
-#     res$rank <- rank(res$P.Value)
-#     res
+### Deviations on Low-accessible regions deviations
+```{r low accessbile devs}
+# devs_thr50 <- lapply(dat, \(x) {
+#     seqlevelsStyle(x) <- "UCSC"
+#     rm <- apply(counts(x), 1, min)
+#     thr <- quantile(rm)[3]
+#     if (thr == 0) thr = 1
+#     idx <- which(rm <= thr)
+#     x <- x[idx, ]
+#     tryCatch(
+#     {
+#       .chromVAR_bulk(x,
+#         Hmotifs,
+#         BSgenome.Hsapiens.UCSC.hg38)
+#     },
+#     error = function(e) {
+#       cat("trying BSgenome.Mmusculus.UCSC.mm10...\n")
+#       .chromVAR_bulk(x,
+#         Mmotifs,
+#         BSgenome.Mmusculus.UCSC.mm10)
+#     })
 # })
-# names(old_limma) <- name
-# saveRDS(old_limma, "../result/02_dat/old_limma.rds")
-old_limma <- readRDS("../result/02_dat/old_limma.rds")
-old_rank <- lapply(names(old_limma), \(e) {
-  x <- old_limma[[e]]
-  #r <- x[str_detect(rownames(x), e), "rank"]
-  r <- x[x$name == e, "rank"]
-  if (length(r) == 0) r <- 0
-  data.frame(rank = r, motif = e, method = "old")
-})
-
-old_rank <- do.call(rbind, old_rank)
+# saveRDS(devs_thr50, "../result/02_dat/devs_thr50.rds")
+devs_thr50 <- readRDS("../result/02_dat/devs_thr50.rds")
+names(devs_thr50) <- name
 ```
 
-## New method with TMM normalization
 
-### New deviations
-```{r new chromVAR}
-devtools::load_all("../../chromVAR/")
-source("utils.R")
-# new_devs <- lapply(names(dat), \(x) {
+### Deviations on NF fragments
+```{r}
+# dir <- list.dirs("../data/02a_nucFree", recursive = FALSE)
+# nucFree <- lapply(dir, \(.) readRDS(paste0(.,
+#   "/runATAC_results/others/countmatrix.rds")))
+# names(nucFree) <- basename(dir)
+# nucFree_devs <- lapply(names(nucFree), \(x) {
 #   d <- dat[[x]]
-#   seqlevelsStyle(d) <- "UCSC" 
+#   seqlevelsStyle(d) <- "UCSC"
+#   message(x)
+#   tryCatch(
+#   {
+#     .chromVAR_bulk(d, 
+#       Hmotifs, 
+#       BSgenome.Hsapiens.UCSC.hg38)
+#   },
+#   error = function(e) {
+#     cat("trying BSgenome.Mmusculus.UCSC.mm10...\n")
+#     .chromVAR_bulk(d, 
+#       Mmotifs, 
+#       BSgenome.Mmusculus.UCSC.mm10)
+#   })
+# })
+# 
+# names(nucFree_devs) <- names(nucFree) 
+# saveRDS(nucFree_devs, "../result/02_dat/nucFree_devs.rds")
+nucFree_devs <- readRDS("../result/02_dat/nucFree_devs.rds")
+names(nucFree_devs)[names(nucFree_devs) == "NR3C1"] <- "GCR"
+```
+
+### Deviations on all fragments of nucleosome-free peaks
+```{r}
+# dir <- list.dirs("../data/02b_fullOnNucFreePeaks/", recursive = FALSE)
+# fullNF <- lapply(dir, \(.) readRDS(paste0(.,
+#   "/runATAC_results/others/countmatrix.rds")))
+# names(fullNF) <- basename(dir)
+# fullNF_devs <- lapply(names(fullNF), \(x) {
+#   d <- dat[[x]]
+#   seqlevelsStyle(d) <- "UCSC"
 #   message(x)
 #   tryCatch(
 #   {
@@ -115,56 +150,137 @@ source("utils.R")
 #     .chromVAR_bulk(d, Mmotifs, BSgenome.Mmusculus.UCSC.mm10)
 #   })
 # })
+# 
+# names(fullNF_devs) <- names(fullNF) 
+# saveRDS(fullNF_devs, "../result/02_dat/fullNF_devs.rds")
+fullNF_devs <- readRDS("../result/02_dat/fullNF_devs.rds")
+names(fullNF_devs)[names(fullNF_devs) == "NR3C1"] <- "GCR"
+```
+
+
+### New method with TMM normalization
+```{r new chromVAR}
+# new_devs <- lapply(names(dat), \(x) {
+#   d <- dat[[x]]
+#   seqlevelsStyle(d) <- "UCSC"
+#   message(x)
+#   tryCatch(
+#   {
+#     .chromVAR_bulk(d, Hmotifs, BSgenome.Hsapiens.UCSC.hg38, TMM = TRUE)
+#   },
+#   error = function(e) {
+#     cat("trying BSgenome.Mmusculus.UCSC.mm10...\n")
+#     .chromVAR_bulk(d, Mmotifs, BSgenome.Mmusculus.UCSC.mm10, TMM = TRUE)
+#   })
+# })
 # names(new_devs) <- name
 # saveRDS(new_devs, "../result/02_dat/new_devs.rds")
 new_devs <- readRDS("../result/02_dat/new_devs.rds")
 ```
 
-### Differential analysis of new deviations
+## Differential analysis of deviations between conditions
 ```{r new limma, warning=FALSE, message=FALSE}
-# new_limma <- lapply(new_devs, \(dev) {
-#     colData(dev)$group_id <- substr(colnames(dev), 1, nchar(colnames(dev)) - 5)
-#     design <- model.matrix(~ dev$group_id)
-#     fit <- eBayes(lmFit(assays(dev)$z, design))
-#     res <- topTable(fit, n = Inf)
-#     ids <- match(rownames(res), rownames(dev))
-#     res$name <- rowData(dev)$name[ids]
-#     res$rank <- rank(res$P.Value)
-#     res
-# })
-# names(new_limma) <- name
-# saveRDS(new_limma, "../result/02_dat/new_limma.rds")
-new_limma <- readRDS("../result/02_dat/new_limma.rds")
+applyLimma <- \(x) {
+  res <- lapply(x, \(dev) {
+    colData(dev)$group_id <- substr(colnames(dev), 1, nchar(colnames(dev)) - 5)
+    design <- model.matrix(~ dev$group_id)
+    fit <- eBayes(lmFit(assays(dev)$z, design))
+    res <- topTable(fit, n = Inf)
+    ids <- match(rownames(res), rownames(dev))
+    res$name <- rowData(dev)$name[ids]
+    res$rank <- rank(res$P.Value)
+    res
+  })
+  names(res) <- names(x)
+  return(res)
+}
+old_limma <- applyLimma(old_devs)
+low_limma <- applyLimma(devs_thr50)
+nucFree_limma <- applyLimma(nucFree_devs)
+fullNF_limma <- applyLimma(fullNF_devs)
+TMM_limma <- applyLimma(new_devs)
 ```
-
-### new rank
-```{r new rank}
-new_rank <- lapply(names(new_limma), \(e) {
-  x <- new_limma[[e]]
-  #r <- x[str_detect(rownames(x), e), "rank"]
-  r <- x[x$name == e, "rank"]
-  if (length(r) == 0) r <- 0
-  data.frame(rank = r, motif = e, method = "new")
-})
-
-new_rank <- do.call(rbind, new_rank)
-```
-
 
 ## Result evaluation and visualization
+### t-statistics
 
-### Rank comparison
-```{r}
-rank <- rbind(old_rank, new_rank)
-rank <- rank[rank$rank != 0, ]
-validMotif <- unique(rank$motif)
-ggplot(rank, aes(x = method, y = rank, fill = method)) +
-  geom_bar(stat = "identity", color = "black", position = position_dodge()) +
-  theme_minimal() + 
-  scale_fill_brewer(palette = "Blues") +
-  facet_wrap(~ motif, ncol = 4, labeller = \(.) label_both(.), scales="free")
-
+::: {.panel-tabset}
+### Original chromVAR
+```{r chromVAR t, fig.height=10, fig.width=15}
+lapply(names(old_limma), \(x) {
+    res <- old_limma[[x]]
+    r <- res[res$name == x, "t"]
+    ggplot(res, aes(t)) +
+      geom_density() + 
+      ggtitle(x) +
+      geom_vline(xintercept = r, linetype="dashed", 
+                  color = "darkred", linewidth=0.8, alpha = 0.8) +
+      annotate("text", x = r, y = 0.15, label = round(r,3), 
+        color = "darkred", size = 5)
+})  |>  wrap_plots(ncol = 4) 
 ```
+
+### TMM normalization
+```{r TMM t, fig.height=10, fig.width=15}
+lapply(names(TMM_limma), \(x) {
+    res <- TMM_limma[[x]]
+    r <- res[res$name == x, "t"]
+    ggplot(res, aes(t)) +
+      geom_density() + 
+      ggtitle(x) +
+      geom_vline(xintercept = r, linetype="dashed", 
+                  color = "darkred", linewidth=0.8, alpha = 0.8) +
+      annotate("text", x = r, y = 0.15, label = round(r,3), 
+        color = "darkred", size = 5)
+})  |>  wrap_plots(ncol = 4) 
+```
+
+### NF fragments
+```{r nucFree t, fig.height=10, fig.width=15}
+lapply(names(nucFree_limma), \(x) {
+    res <- nucFree_limma[[x]]
+    r <- res[res$name == x, "t"]
+    ggplot(res, aes(t)) +
+      geom_density() + 
+      ggtitle(x) +
+      geom_vline(xintercept = r, linetype="dashed", 
+                  color = "darkred", linewidth=0.8, alpha = 0.8) +
+      annotate("text", x = r, y = 0.15, label = round(r,3), 
+        color = "darkred", size = 5)
+})  |>  wrap_plots(ncol = 4) 
+```
+
+### All fragments of NF peaks
+```{r allF t, fig.height=10, fig.width=15}
+lapply(names(fullNF_limma), \(x) {
+    res <- fullNF_limma[[x]]
+    r <- res[res$name == x, "t"]
+    ggplot(res, aes(t)) +
+      geom_density() + 
+      ggtitle(x) +
+      geom_vline(xintercept = r, linetype="dashed", 
+                  color = "darkred", linewidth=0.8, alpha = 0.8) +
+      annotate("text", x = r, y = 0.15, label = round(r,3), 
+        color = "darkred", size = 5)
+})  |>  wrap_plots(ncol = 4) 
+```
+
+### Low accessible regions
+```{r lowAccessible t, fig.height=10, fig.width=15}
+lapply(names(low_limma), \(x) {
+    res <- low_limma[[x]]
+    r <- res[res$name == x, "t"]
+    ggplot(res, aes(t)) +
+      geom_density() + 
+      ggtitle(x) +
+      geom_vline(xintercept = r, linetype="dashed", 
+                  color = "darkred", linewidth=0.8, alpha = 0.8) +
+      annotate("text", x = r, y = 0.15, label = round(r,3), 
+        color = "darkred", size = 5)
+})  |>  wrap_plots(ncol = 4) 
+```
+
+:::
 
 ### Distribution of z-scores
 
@@ -175,7 +291,10 @@ ggplot(rank, aes(x = method, y = rank, fill = method)) +
 lapply(names(old_devs), \(x) {
     dev <- old_devs[[x]]
     ggplot(sechm::meltSE(dev, row.names(dev)), aes(z, colour = sample)) +
-        geom_density() + ggtitle(paste0("Motif: ", x))
+      geom_density() + 
+      ggtitle(x) +
+      geom_vline(xintercept = 0, linetype="dashed", 
+                  color = "black", size=0.5, alpha = 0.5)
 })  |>  wrap_plots(ncol = 2) 
 
 ```
@@ -185,10 +304,44 @@ lapply(names(old_devs), \(x) {
 lapply(names(new_devs), \(x) {
     dev <- new_devs[[x]]
     ggplot(sechm::meltSE(dev, row.names(dev)), aes(z, colour = sample)) +
-        geom_density() + ggtitle(paste0(
-            "Motif: ", x))
+      geom_density() + ggtitle(x) +
+      geom_vline(xintercept = 0, linetype="dashed", 
+                  color = "black", size=0.5, alpha = 0.5)
 })  |>  wrap_plots(ncol = 2) 
 
+```
+
+### Nucleosome-free fragments
+```{r z-dist nucFree, fig.height=15, fig.width=10}
+lapply(names(nucFree_devs), \(x) {
+    dev <- nucFree_devs[[x]]
+    ggplot(sechm::meltSE(dev, row.names(dev)), aes(z, colour = sample)) +
+      geom_density() + ggtitle(x) +
+      geom_vline(xintercept = 0, linetype="dashed", 
+                  color = "black", size=0.5, alpha = 0.5)
+})  |>  wrap_plots(ncol = 2) 
+```
+
+### All fragments of nucleosome-free peaks
+```{r z-dist fullNF, fig.height=15, fig.width=10}
+lapply(names(fullNF_devs), \(x) {
+    dev <- fullNF_devs[[x]]
+    ggplot(sechm::meltSE(dev, row.names(dev)), aes(z, colour = sample)) +
+        geom_density() + ggtitle(x) +
+      geom_vline(xintercept = 0, linetype="dashed", 
+                  color = "black", size=0.5, alpha = 0.5)
+})  |>  wrap_plots(ncol = 2) 
+```
+
+### Low accessible regions
+```{r z-dist low, fig.height=15, fig.width=10}
+lapply(names(devs_thr50), \(x) {
+    dev <- devs_thr50[[x]]
+    ggplot(sechm::meltSE(dev, row.names(dev)), aes(z, colour = sample)) +
+        geom_density() + ggtitle(x) +
+      geom_vline(xintercept = 0, linetype="dashed", 
+                  color = "black", size=0.5, alpha = 0.5)
+})  |>  wrap_plots(ncol = 2) 
 ```
 
 :::
@@ -196,32 +349,32 @@ lapply(names(new_devs), \(x) {
 ### logFC of limma results
 
 ```{r lfc, fig.height=6, fig.width=12}
-lfc <- lapply(names(old_limma), \(x) {
-    old <- data.frame(old_limma[[x]], motif = x, method = "old")
-    new <- data.frame(new_limma[[x]], motif = x, method = "new")
-    rbind(old, new)
-})
-lfc <- do.call(rbind, lfc)
+# lfc <- lapply(names(old_limma), \(x) {
+#     old <- data.frame(old_limma[[x]], motif = x, method = "old")
+#     new <- data.frame(new_limma[[x]], motif = x, method = "new")
+#     rbind(old, new)
+# })
+# lfc <- do.call(rbind, lfc)
 ```
 
 ::: {.panel-tabset}
 ### Histogram
 ```{r lfc histo, fig.height=15, fig.width=10}
-ggplot(lfc, aes(x = logFC, col = method)) + 
-    geom_histogram(aes(y = after_stat(density)),      
-        fill = "white",
-        bins = 100,
-        alpha = 0.2) +
-    geom_density() + 
-    facet_grid(motif ~ method, scales = "free")
+# ggplot(lfc, aes(x = logFC, col = method)) + 
+#     geom_histogram(aes(y = after_stat(density)),      
+#         fill = "white",
+#         bins = 100,
+#         alpha = 0.2) +
+#     geom_density() + 
+#     facet_grid(motif ~ method, scales = "free")
 ```
 
 ### Violin plot
 ```{r violin}
-ggplot(lfc, aes(x = factor(motif), y = logFC, fill = method)) +
-  geom_violin(alpha = 0.5) +
-  geom_boxplot(width = 0.2, position = position_dodge(0.9), alpha = 0.4) +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+# ggplot(lfc, aes(x = factor(motif), y = logFC, fill = method)) +
+#   geom_violin(alpha = 0.5) +
+#   geom_boxplot(width = 0.2, position = position_dodge(0.9), alpha = 0.4) +
+#   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 ```
 
 ::: 
@@ -232,36 +385,36 @@ ggplot(lfc, aes(x = factor(motif), y = logFC, fill = method)) +
 
 ### New method
 ```{r MA new, fig.height=15, fig.width=20}
-colnames(lfc)[c(1,2,5)] <- c("log2FoldChange", "baseMeanLog2", "padj")
-nlfc <- lfc[lfc$method == "new",]
-olfc <- lfc[lfc$method == "old",]
-lapply(unique(nlfc$motif), \(x) {
-  df <- nlfc[nlfc$motif == x,]
-  ggmaplot(df, dr = 0.05, fc = 2, size = 0.4,
-     palette = c("#B31B21", "#1465AC", "darkgray"),
-     genenames = as.vector(df$name),
-     legend = "top", top = 20,
-     font.label = c("bold", 11),
-     font.legend = "bold",
-     font.main = "bold",
-     ggtheme = ggplot2::theme_minimal()) + ggtitle(x)
-})  |>  wrap_plots(ncol = 4) 
+# colnames(lfc)[c(1,2,5)] <- c("log2FoldChange", "baseMeanLog2", "padj")
+# nlfc <- lfc[lfc$method == "new",]
+# olfc <- lfc[lfc$method == "old",]
+# lapply(unique(nlfc$motif), \(x) {
+#   df <- nlfc[nlfc$motif == x,]
+#   ggmaplot(df, dr = 0.05, fc = 2, size = 0.4,
+#      palette = c("#B31B21", "#1465AC", "darkgray"),
+#      genenames = as.vector(df$name),
+#      legend = "top", top = 20,
+#      font.label = c("bold", 11),
+#      font.legend = "bold",
+#      font.main = "bold",
+#      ggtheme = ggplot2::theme_minimal()) + ggtitle(x)
+# })  |>  wrap_plots(ncol = 4) 
 
 ```
 
 ### Old
 ```{r MA old, fig.height=15, fig.width=20}
-lapply(unique(olfc$motif), \(x) {
-  df <- olfc[olfc$motif == x,]
-  ggmaplot(df, dr = 0.05, fc = 2, size = 0.4,
-     palette = c("#B31B21", "#1465AC", "darkgray"),
-     genenames = as.vector(df$name),
-     legend = "top", top = 20,
-     font.label = c("bold", 11),
-     font.legend = "bold",
-     font.main = "bold",
-     ggtheme = ggplot2::theme_minimal()) + ggtitle(x)
-})  |>  wrap_plots(ncol = 4) 
+# lapply(unique(olfc$motif), \(x) {
+#   df <- olfc[olfc$motif == x,]
+#   ggmaplot(df, dr = 0.05, fc = 2, size = 0.4,
+#      palette = c("#B31B21", "#1465AC", "darkgray"),
+#      genenames = as.vector(df$name),
+#      legend = "top", top = 20,
+#      font.label = c("bold", 11),
+#      font.legend = "bold",
+#      font.main = "bold",
+#      ggtheme = ggplot2::theme_minimal()) + ggtitle(x)
+# })  |>  wrap_plots(ncol = 4) 
 ```
 
 

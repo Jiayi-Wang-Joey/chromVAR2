@@ -31,7 +31,7 @@ addAnnotations <- \(motif_ix) {
 }
 
 
-.chromVAR_bulk <- \(x, motifs, genome, annotation) {
+.chromVAR_bulk <- \(x, motifs, genome, annotation = FALSE, TMM = FALSE) {
     x <- filterPeaks(x, non_overlapping = TRUE)
     x <- addGCBias(x, 
         genome = genome)
@@ -42,7 +42,9 @@ addAnnotations <- \(motif_ix) {
     if (annotation == TRUE) motif_ix <- addAnnotations(motif_ix)
     dev <- computeDeviations(object = x, 
         annotations = motif_ix,
-        background_peaks = bg
+        expectation = computeExpectations(x),
+        background_peaks = bg,
+        TMM = TMM
         )
 }
 

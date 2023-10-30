@@ -40,7 +40,7 @@ set.seed(2017)
 
 ## Load real data
 ```{r data, message=FALSE, warning=FALSE}
-dat <- readRDS("../data/others/caradonna.subset.peakCounts.rds")
+dat <- readRDS("../data/03_technical/caradonna.subset.peakCounts.rds")
 seqlevelsStyle(dat) <- "UCSC"
 dat <- keepStandardChromosomes(dat, 
   species="Mus_musculus", 

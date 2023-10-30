@@ -31,7 +31,6 @@ suppressPackageStartupMessages({
     library(stringr)
     library(data.table)
     library(ggpubr)
-    library(csaw)
     source("utils.R")
 })
 set.seed(2017)
@@ -51,25 +50,26 @@ names(sims) <- c("0", "0.25", "0.5", "1", "3")
 ### Get deviations
 ```{r chromVAR sim}
 motifs <- getNonRedundantMotifs(format = "PFMatrix", species = "Hsapiens")
-old_devs <- lapply(sims, .chromVAR_bulk,
-    motifs,
-    BSgenome.Hsapiens.UCSC.hg38,
-    TRUE)
+old_devs <- lapply(sims, \(x) {
+    x <- filterPeaks(x, non_overlapping = TRUE)
+    x <- addGCBias(x,
+        genome = BSgenome.Hsapiens.UCSC.hg38)
+    bg <- getBackgroundPeaks(object = x, niterations = 1500)
+    motif_ix <- matchMotifs(motifs,
+        x,
+        genome = BSgenome.Hsapiens.UCSC.hg38)
+    #motif_ix <- addAnnotations(motif_ix)
+    dev <- computeDeviations(object = x,
+        annotations = motif_ix,
+        background_peaks = bg,
+        expectation = computeExpectations(x),
+        TMM = FALSE
+    )
+})
+
 names(old_devs) <- names(sims)
 saveRDS(old_devs, "../result/01_sim/old_devs.rds")
-#old_devs <- readRDS("../result/01_sim/old_devs.rds")
-```
-
-### csaw normalization on z-score
-```{r}
-# csaw_devs <- lapply(old_devs, \(x) {
-#     assay(x, "z") <- exp(assay(x, "z"))
-#     x$totals <- colSums(assay(x, "z"))
-#     x <- normOffsets(x, assay.id = "z")
-# })
-# names(csaw_devs) <- names(old_devs)
-# saveRDS(csaw_devs, "../result/01_sim/csaw_devs.rds")
-csaw_devs <- readRDS("../result/01_sim/csaw_devs.rds")
+old_devs <- readRDS("../result/01_sim/old_devs.rds")
 ```
 
 
@@ -84,15 +84,17 @@ TMM_devs <- lapply(sims, \(x) {
     motif_ix <- matchMotifs(motifs,
         x,
         genome = BSgenome.Hsapiens.UCSC.hg38)
-    motif_ix <- addAnnotations(motif_ix)
+    #motif_ix <- addAnnotations(motif_ix)
     dev <- computeDeviations(object = x,
         annotations = motif_ix,
-        background_peaks = bg
+        background_peaks = bg,
+        expectation = computeExpectations(x),
+        TMM = TRUE
         )
 })
 names(TMM_devs) <- names(sims)
 saveRDS(TMM_devs, "../result/01_sim/TMM_devs.rds")
-#TMM_devs <- readRDS("../result/01_sim/TMM_devs.rds")
+TMM_devs <- readRDS("../result/01_sim/TMM_devs.rds")
 ```
 
 ## Differential analysis of deviations between conditions
@@ -105,62 +107,49 @@ applyLimma <- \(devs, assay.id = "z") {
     res <- topTable(fit, n = Inf)
     ids <- match(rownames(res), rownames(dev))
     res$name <- rowData(dev)$name[ids]
-    res$rank <- rank(res$P.Value)
     res 
     })
 }
 old_limma <- applyLimma(old_devs)
-csaw_limma <- applyLimma(csaw_devs, assay = "offset")
 TMM_limma <- applyLimma(TMM_devs)
 names(TMM_limma) <- names(sims)
 names(old_limma) <- names(sims)
-names(csaw_limma) <- names(sims)
 ```
 
 
 
 ## Comparisons of results between different normalizations
 
-### Rank of CEBPB
-```{r TMM rank, message = FALSE, fig.height=8, fig.width=8}
+### t-statistics of CEBPB
+```{r TMM rank, message = FALSE, fig.height=5, fig.width=10}
 TMM_rank <- lapply(names(TMM_limma), \(e) {
     x <- TMM_limma[[e]]
-    x$chip <- addChIP(rownames(x))
+    #x$chip <- addChIP(rownames(x))
     r <- x[str_detect(x$name, "CEBPB"),]
-    data.frame(rank = r$rank, effect = e, 
-      method = "TMM", chip = r$chip,
+    data.frame(t = r$t, effect = e, 
+      method = "TMM", #chip = r$chip,
       name = r$name)
 })
 TMM_rank <- do.call(rbind, TMM_rank)
 
 old_rank <- lapply(names(old_limma), \(e) {
     x <- old_limma[[e]]
-    x$chip <- addChIP(rownames(x))
+    #x$chip <- addChIP(rownames(x))
     r <- x[str_detect(x$name, "CEBPB"),]
-    data.frame(rank = r$rank, effect = e, 
-      method = "old", chip = r$chip,
+     data.frame(t = r$t, effect = e, 
+      method = "old", #chip = r$chip,
       name = r$name)
 })
 old_rank <- do.call(rbind, old_rank)
 
-csaw_rank <- lapply(names(csaw_limma), \(e) {
-    x <- csaw_limma[[e]]
-    x$chip <- addChIP(rownames(x))
-    r <- x[str_detect(x$name, "CEBPB"),]
-    data.frame(rank = r$rank, effect = e, 
-      method = "csaw", chip = r$chip,
-      name = r$name)
-})
-csaw_rank <- do.call(rbind, csaw_rank)
+rank <- rbind(TMM_rank, old_rank)
 
-rank <- do.call(rbind, list(TMM_rank, old_rank, csaw_rank))
-
-ggplot(rank, aes(x = effect, y = sqrt(rank), group = method,
-    label = rank, color = method)) +
+ggplot(rank, aes(x = effect, y = t, group = method,
+    label = t, color = method)) +
     geom_line(linetype = "dashed") +
     geom_point() +
-    geom_label(fill = "white", alpha = 0.4) + 
-    facet_grid(method ~ chip, scales = "free") 
+    facet_grid(. ~ method, scales = "free") +
+    xlab("t-statistics")
 ```
 
 ### Distribution of z-scores
@@ -343,4 +332,9 @@ lapply(unique(olfc$effect), \(x) {
 
 :::
 
+```{r}
+dge <-  DGEList(counts = counts(sim))
+dge <- edgeR::calcNormFactors(dge)
+nc <- cpm(dge, normalized.lib.sizes = TRUE, log = FALSE)
+```
 

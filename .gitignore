@@ -53,4 +53,4 @@ result/*
 .Rhistory
 .DS_Store
 ._.DS_Store
-code/.*
+code/.**
