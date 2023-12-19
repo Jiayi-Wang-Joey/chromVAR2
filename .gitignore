@@ -54,3 +54,11 @@ result/*
 .DS_Store
 ._.DS_Store
 code/.*
+plts/**
+outs/*
+logs/*
+._Snakefile
+._code
+.snakemake/
+code_old/*
+config.yaml
