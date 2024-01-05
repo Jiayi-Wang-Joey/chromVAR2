@@ -13,7 +13,6 @@ fs <- list.files(paste0("/mnt/plger/plger/DTFAB/fullFrags/",
                    full.names = TRUE)
 lst <- as.list(fs)
 names(lst) <- basename(fs)
-print(lst)
 x <- .importFragments(lst)
   
 saveRDS(x, args$res)

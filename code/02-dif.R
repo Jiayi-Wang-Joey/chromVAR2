@@ -14,6 +14,13 @@ source(args$fun)
 
 if (m %in% mice) {
     Mmotifs <- getNonRedundantMotifs(format="PFMatrix", species="Mmusculus")
+    if (m=="BANP") {
+        banp <- readRDS("data/BANP.PFMatrix.rds")
+        Mmotifs$BANP <- banp
+    } else if (m=="NR1H3") {
+        Hmotifs <- getNonRedundantMotifs(format="PFMatrix", species="Hsapiens")
+        Mmotifs$NR1H3 <- Hmotifs$NR1H3
+    }
     res <- fun(se, 
         genome = BSgenome.Mmusculus.UCSC.mm10, 
         motif = Mmotifs)

@@ -12,7 +12,7 @@ MOT = ["BANP", "ESR1", "GATA1","GATA2","KLF1","MYC","NR1H3", "NR1H4",
 # rowTypes
 ROW = ["peaks"] #"motifs"
 # smoother
-SMT = ["none","smooth.2d_0", "smooth.2d_0.1", "smooth.2d_0.3", "smooth.2d_0.5", "smooth.2d_0.7", "smooth.2d_0.9"]
+SMT = ["none","smooth.2d_0.5", "smooth.2d_1", "smooth.2d_2"]
 # differential analysis methods
 DIF = glob_wildcards("code/02-dif-{x}.R").x
 # data filenames
@@ -43,7 +43,7 @@ res = {
 rule all: 
     input:
         # fragments
-        frg, 
+        #frg, 
         # counts
         ttl, wgt,
         # differential anlysis

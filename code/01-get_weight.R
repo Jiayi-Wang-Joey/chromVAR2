@@ -2,12 +2,12 @@ suppressPackageStartupMessages({
     library(data.table)
     library(GenomicRanges)
     library(R.utils)
+    library(fields)
     library(SummarizedExperiment)
     source("~/chromVAR/R/getCounts.R")
     library(BSgenome.Hsapiens.UCSC.hg38)
     library(BSgenome.Mmusculus.UCSC.mm10)
     library(rtracklayer)
-    library(fields)
 })
 
 args <- R.utils::commandArgs(trailingOnly = TRUE, asValues=TRUE)

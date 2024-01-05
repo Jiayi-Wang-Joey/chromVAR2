@@ -17,9 +17,10 @@ df <- do.call(rbind, res)
 df$method <- paste0(df$mode,",", df$smooth,",", df$dif)
 
 pr <- ggplot(df, 
-    aes(test, method, fill=rank)) +
+    aes(reorder(test,-sqrt(rank)), 
+        reorder(method,-sqrt(rank)), fill=rank)) +
     geom_tile(col="white") +
-    geom_text(aes(label = rank), size = 2) +
+    geom_text(aes(label = rank), size = 1.5) +
     scale_fill_distiller(NULL,
         palette="RdYlBu", na.value="lightgrey",
         n.breaks=3, direction=-1) +
@@ -34,7 +35,8 @@ pr <- ggplot(df,
     ggtitle("rank")
 
 pt <- ggplot(df, 
-    aes(test, method, fill=t)) +
+    aes(reorder(test,abs(t)), 
+        reorder(method,abs(t)), fill=t)) +
     geom_tile(col="white") +
     geom_text(aes(label = round(t, 2)), size = 1.5) +
     scale_fill_distiller(NULL,
