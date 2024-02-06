@@ -22,8 +22,8 @@ fun <- function(x, genome, motif) {
     design <- model.matrix(~ group_id)
     fit <- eBayes(lmFit(assay(dev, "z"), design))
     res <- topTable(fit, n = Inf)
-    ids <- match(rownames(res), rownames(dev))
-    res$name <- rowData(dev)$name[ids]
+    #ids <- match(rownames(res), rownames(dev))
+    #res$name <- rowData(dev)$name[ids]
     res$rank <- seq_len(nrow(res))
     res 
 }

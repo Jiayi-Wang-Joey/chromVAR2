@@ -34,12 +34,12 @@ if (m %in% mice) {
 if (is.null(args$smt)) {
     df <- data.frame(res, test=m, 
         dif=args$dif, mode="total", 
-        row=args$row, smooth="none", 
+        row=args$row, smooth="none", peakWeight="none",
         row.names=rownames(res))
 } else {
     df <- data.frame(res, test=m, 
         dif=args$dif, mode="weight", 
-        row=args$row, smooth=args$smt, 
+        row=args$row, smooth=args$smt, peakWeight=args$pkw,
         row.names=rownames(res))
 }
 

@@ -8,13 +8,16 @@ args <- R.utils::commandArgs(trailingOnly = TRUE, asValues=TRUE)
 fs <- strsplit(args[[1]], ";")[[1]]
 res <- lapply(fs, function(x) {
     df <- readRDS(x)
-    df <- df[row.names(df)==df$test[1],]
-    df <- df[,c("t", "rank", "mode", "dif", "test", "smooth")]
+    test <- ifelse(df$test[1]!="MYC", df$test[1], "MAX")
+    #test <- df$test[1]
+    df <- df[row.names(df)==test,]
+    df <- df[,c("t", "rank", "mode", "dif", "test", "smooth", "peakWeight")]
+    #df <- df[,c("rank", "mode", "dif", "test", "smooth")]
    
 })
 res <- res[vapply(res, function(x) nrow(x)!=0, logical(1))]
 df <- do.call(rbind, res)
-df$method <- paste0(df$mode,",", df$smooth,",", df$dif)
+df$method <- paste0(df$mode,",", df$smooth, ",", df$peakWeight,",", df$dif)
 
 pr <- ggplot(df, 
     aes(reorder(test,-sqrt(rank)), 
@@ -34,16 +37,16 @@ pr <- ggplot(df,
         axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
     ggtitle("rank")
 
-pt <- ggplot(df, 
-    aes(reorder(test,abs(t)), 
-        reorder(method,abs(t)), fill=t)) +
+pt <- ggplot(df,
+    aes(reorder(test,abs(t)),
+        reorder(method,abs(t)), fill=abs(t))) +
     geom_tile(col="white") +
     geom_text(aes(label = round(t, 2)), size = 1.5) +
     scale_fill_distiller(NULL,
         palette="RdYlBu", na.value="lightgrey",
         n.breaks=3, direction=-1) +
     labs(x="motifs", y="method") +
-    coord_fixed(expand=FALSE) + 
+    coord_fixed(expand=FALSE) +
     theme_minimal(6) + theme(
         legend.position="bottom",
         panel.border=element_rect(fill=NA),
@@ -53,5 +56,5 @@ pt <- ggplot(df,
     ggtitle("t-value")
 
 gg <- pt + pr + plot_annotation(tag_levels="a")
-ggsave(args[[2]], gg, width=20, height=10, units="cm")
+ggsave(args[[2]], gg, width=18, height=12, units="cm")
 

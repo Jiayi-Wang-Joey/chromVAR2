@@ -16,7 +16,6 @@ fun <- function(x, genome, motif) {
     fit <- eBayes(lmFit(y, design))
     res <- topTable(fit, n = Inf)
     ids <- match(rownames(res), rownames(y))
-    res$name <- rownames(x)$name[ids]
     res$rank <- seq_len(nrow(res))
     res 
     

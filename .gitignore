@@ -62,3 +62,4 @@ logs/*
 .snakemake/
 code_old/*
 config.yaml
+docs/*
