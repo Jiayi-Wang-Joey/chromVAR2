@@ -35,13 +35,16 @@ dat_pkd = [
 
 ############### simulated datasets ################
 # WILDCARDS --------------------------------------------------------------------
-MTF = ["CEBPB", "MAZ", "ZNF143"]
+MTF = ["CEBPB", "MAZ", "ZNF143", "CTCF"]
 EFT = ["0", "0.25", "0.5", "1", "3"]
 
 # RESULTS --------------------------------------------------------------------
 sim = expand("/mnt/plger/jwang/data/sim/00-frg/{mtf},{eft}.rds", mtf=MTF, eft=EFT)
 sim_ttl = expand("/mnt/plger/jwang/data/sim/01-total/total-{mtf},{eft},{row}.rds", mtf=MTF, eft=EFT, row=ROW)
 sim_wgt = expand("/mnt/plger/jwang/data/sim/01-weight/weight-{mtf},{eft},{row}-{smt}-{pkw}.rds", mtf=MTF, eft=EFT, row=ROW, smt=SMT, pkw=PKW)
+sim_dif = [
+    expand("outs/sim/dif-total-{mtf},{eft}-{row},{dif}.rds", mtf=MTF, eft=EFT, row=ROW, dif=DIF),
+    expand("outs/sim/dif-weight-{mtf},{eft}-{row}-{smt}-{pkw},{dif}.rds", mtf=MTF, eft=EFT, row=ROW, smt=SMT, pkw=PKW, dif=[x for x in DIF if "chromVAR" not in x])]
 
 
 dat_res = {
@@ -55,21 +58,28 @@ dat_res = {
 sim_res = {
      "sim": sim,
      "ttl": sim_ttl,
-     "wgt": sim_wgt
+     "wgt": sim_wgt,
+     "dif": sim_dif
 }
 
 # visualization
 plt = []
 VAL = dat_res.keys()
+WAL = sim_res.keys()
 for val in VAL:
     x = glob_wildcards("code/04-plt_"+val+"-{x}.R").x
     plt += expand("plts/dat/{val}-{plt}.pdf", val=val, plt=x)
+
+qlt = []
+for wal in WAL:
+    x = glob_wildcards("code/04-qlt_"+wal+"-{x}.R").x
+    qlt += expand("plts/sim/{wal}-{qlt}.pdf", wal=wal, qlt=x)
 
 # SETUP ========================================================================
 rule all: 
     input:
         [x for x in dat_res.values()], plt,
-        [x for x in sim_res.values()]
+        [x for x in sim_res.values()], qlt
 
 # real datasets
 rule get_dat:
@@ -114,11 +124,11 @@ rule dif_ttl:
 
 rule dif_wgt:
     priority: 97
-    input:  "code/02-dif.R",
+    input:  "code/02-dif_dat.R",
             "code/02-dif-{dif}.R",
             rules.dat_wgt.output
     output: "outs/dat/dif-weight-{mot}-{row}-{smt}-{pkw},{dif}.rds"
-    log:    "logs/dif-weight-{mot}-{row}-{smt}-{pkw},{dif}.rds.Rout"
+    log:    "logs/dat_dif-weight-{mot}-{row}-{smt}-{pkw},{dif}.rds.Rout"
     shell: '''
         {R} CMD BATCH --no-restore --no-save "--args\
         mot={wildcards.mot} row={wildcards.row} smt={wildcards.smt} pkw={wildcards.pkw} fun={input[1]} dif={wildcards.dif} res={output} dat={input[2]}" {input[0]} {log}''' 
@@ -176,6 +186,30 @@ rule sim_wgt:
         {R} CMD BATCH --no-restore --no-save "--args\
         mtf={wildcards.mtf} eft={wildcards.eft} row={wildcards.row} smt={wildcards.smt} pkw={wildcards.pkw} res={output} frg={input[1]}" {input[0]} {log}'''
 
+rule dar_ttl:
+    priority: 97
+    input:  "code/02-dif_sim.R",
+            "code/02-dif-{dif}.R",
+            rules.sim_ttl.output
+    output: "outs/sim/dif-total-{mtf},{eft}-{row},{dif}.rds"
+    log:    "logs/sim_dif-total-{mtf},{eft}-{row},{dif}.rds.Rout"
+    shell: '''
+        {R} CMD BATCH --no-restore --no-save "--args\
+        mtf={wildcards.mtf} eft={wildcards.eft} row={wildcards.row} dif={wildcards.dif} fun={input[1]} res={output} dat={input[2]}" {input[0]} {log}'''
+
+rule dar_wgt:
+    priority: 97
+    input:  "code/02-dif_sim.R",
+            "code/02-dif-{dif}.R",
+            rules.sim_wgt.output
+    output: "outs/sim/dif-weight-{mtf},{eft}-{row}-{smt}-{pkw},{dif}.rds"
+    log:    "logs/sim_dif-weight-{mtf},{eft}-{row}-{smt}-{pkw},{dif}.rds.Rout"
+    shell: '''
+        {R} CMD BATCH --no-restore --no-save "--args\
+        mtf={wildcards.mtf} eft={wildcards.eft} row={wildcards.row} smt={wildcards.smt} pkw={wildcards.pkw} dif={wildcards.dif} fun={input[1]} res={output} dat={input[2]}" {input[0]} {log}'''
+
+
+
 
 # VISUALIZATION ========================================================
 for val in VAL:
@@ -184,7 +218,19 @@ for val in VAL:
         input:  expand("code/04-plt_{val}-{{plt}}.R", val = val), x = dat_res[val]
         params: lambda wc, input: ";".join(input.x)
         output: expand("plts/dat/{val}-{{plt}}.pdf", val = val)
-        log:    expand("logs/plt_{val}-{{plt}}.Rout", val = val)
+        log:    expand("logs/dat_plt_{val}-{{plt}}.Rout", val = val)
+        shell:  '''
+            {R} CMD BATCH --no-restore --no-save "--args\
+            {params} {output[0]}" {input[0]} {log}'''
+    
+
+for wal in WAL:
+    rule:
+        priority: 49
+        input:  expand("code/04-qlt_{wal}-{{plt}}.R", wal = wal), x = sim_res[wal]
+        params: lambda wc, input: ";".join(input.x)
+        output: expand("plts/sim/{wal}-{{plt}}.pdf", wal = wal)
+        log:    expand("logs/sim_plt_{wal}-{{plt}}.Rout", wal = wal)
         shell:  '''
             {R} CMD BATCH --no-restore --no-save "--args\
             {params} {output[0]}" {input[0]} {log}'''

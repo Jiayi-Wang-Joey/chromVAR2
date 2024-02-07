@@ -7,6 +7,7 @@ suppressPackageStartupMessages({
 })
 
 fun <- function(x, genome, motif) {
+    x <- x[which(!is.infinite(rowSums(assay(x, "type_1")))),]
     x <- filterPeaks(x, non_overlapping = TRUE)
     motif_ix <- matchMotifs(motif, x, genome = genome)
     y <- t(assay(motif_ix))%*%assay(x, "type_1")
@@ -17,8 +18,6 @@ fun <- function(x, genome, motif) {
     fit <- eBayes(lmFit(y, design))
     res <- topTable(fit, n = Inf)
     ids <- match(rownames(res), rownames(y))
-    #res$name <- rownames(x)$name[ids]
-    #res$rank <- rank(res$adj.P.Val)
     res$rank <- seq_len(nrow(res))
     res 
     

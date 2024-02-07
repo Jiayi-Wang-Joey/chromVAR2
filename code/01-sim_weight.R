@@ -41,7 +41,7 @@ se <- getCounts(atacFrag = atacFrag,
     width = 300,
     smooth = smt[1],
     nGCBins = 10,
-    nWidthBins = 36,
+    nWidthBins = 35,
     aRange = aRange,
     peakWeight = pkw)
 

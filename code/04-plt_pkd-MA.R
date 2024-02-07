@@ -23,8 +23,8 @@ df$method <- paste0(df$mode,",", df$peakWeight,",", df$dif)
 
 ps <- lapply(split(df, df$test), \(fd) {
         ggplot(fd, aes(x=baseMeanLog2, y=log2FoldChange)) +
-            #geom_pointdensity() +
-            geom_point_rast(alpha=0.5) +
+            geom_pointdensity(alpha=0.5) +
+            #geom_point_rast(alpha=0.5) +
             geom_smooth(method="lm") +
             ggtitle(fd$test[[1]]) +
             theme(plot.title = element_text(size = 7)) +

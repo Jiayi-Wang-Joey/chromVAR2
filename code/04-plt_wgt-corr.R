@@ -17,30 +17,35 @@ info <- data.frame(do.call(rbind, info))
 colnames(info) <- c("mode", "motif", "row", "smooth", "peakWeight")
 info$peakWeight <- gsub("\\.rds$", "", info$peakWeight)
 
+
+.rename <- \(y) {
+  c(sapply(seq_len(ncol(y)/2), \(x) paste0("ctrl", x)),
+    sapply(seq_len(ncol(y)/2), \(x) paste0("treat", x)))
+}
+
+.rmDiag <- \(x, method = "spearman") {
+  colnames(x) <- .rename(x)
+  corr <- cor(x, use="pairwise", method = method)
+  corr[lower.tri(corr, diag=TRUE)] <- NA
+  na.omit(melt(corr))
+}
+
 df <- lapply(seq_len(length(se)), \(i) {
   x <- se[[i]]
-  y <- assay(x, "counts")
-  rename <- \(y) {
-    c(sapply(seq_len(ncol(y)/2), \(x) paste0("ctrl", x)),
-      sapply(seq_len(ncol(y)/2), \(x) paste0("treat", x)))
-  }
-  colnames(y) <- rename(y)
   m <- info[i,"motif"]
-  total <- readRDS(paste0("/mnt/plger/jwang/data/01-total/total-", m, "-peaks.rds"))
+  total <- readRDS(paste0("/mnt/plger/jwang/data/dat/01-total/total-", m, "-peaks.rds"))
   z <- assay(total, "counts")
-  colnames(z) <- rename(z)
-  rbind(data.frame(melt(lower.tri(cor(y, use="pairwise"), diag = FALSE)),
+  y <- assay(x, "counts")
+  rbind(data.frame(.rmDiag(y, method="pearson"),
     cor = "Pearson", peakWeight = info[i, "peakWeight"], 
     motif = m),
-    data.frame(melt(lower.tri(cor(y, use="pairwise", method = "spearman"),
-      diag = FALSE)), 
+    data.frame(.rmDiag(y, method="spearman"), 
       cor = "Spearman", peakWeight = info[i, "peakWeight"], 
       motif = m),
-    data.frame(melt(lower.tri(cor(z, use="pairwise"), diag = FALSE)),
+    data.frame(.rmDiag(z, method="pearson"),
       cor = "Pearson", peakWeight = "origin", 
       motif = m),
-    data.frame(melt(lower.tri(cor(z, use="pairwise", method="spearman"), 
-      diag = FALSE)),
+    data.frame(.rmDiag(z, method="spearman"),
       cor = "Spearman", peakWeight = "origin", 
       motif = m))
 }) %>% bind_rows()
