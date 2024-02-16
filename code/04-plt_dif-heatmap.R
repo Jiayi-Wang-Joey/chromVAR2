@@ -38,8 +38,8 @@ pr <- ggplot(df,
     ggtitle("rank")
 
 pt <- ggplot(df,
-    aes(reorder(test,abs(t)),
-        reorder(method,abs(t)), fill=abs(t))) +
+    aes(reorder(test,-sqrt(rank)),
+        reorder(method,-sqrt(rank)), fill=t)) +
     geom_tile(col="white") +
     geom_text(aes(label = round(t, 2)), size = 1.5) +
     scale_fill_distiller(NULL,

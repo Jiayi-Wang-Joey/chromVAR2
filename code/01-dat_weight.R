@@ -11,6 +11,7 @@ suppressPackageStartupMessages({
     library(edgeR)
     library(limma)
     library(dplyr)
+    library(rsample)
 })
 
 args <- R.utils::commandArgs(trailingOnly = TRUE, asValues=TRUE)
@@ -34,7 +35,7 @@ if (m %in% mice) {
         width = 300,
         smooth = smt[1],
         nGCBins = 10,
-        nWidthBins = 35,
+        nWidthBins = 30,
         aRange = aRange,
         peakWeight = pkw)
 } else {
@@ -47,7 +48,7 @@ if (m %in% mice) {
         width = 300,
         smooth = smt[1],
         nGCBins = 10,
-        nWidthBins = 35,
+        nWidthBins = 30,
         aRange = aRange,
         peakWeight = pkw)
 }

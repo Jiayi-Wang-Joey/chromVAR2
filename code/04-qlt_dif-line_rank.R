@@ -18,12 +18,13 @@ res <- lapply(fs, function(x) {
 
 res <- res[vapply(res, function(x) nrow(x)!=0, logical(1))]
 df <- do.call(rbind, res)
+df$significance <- ifelse(df$adj.P.Val < 0.05, TRUE, FALSE)
 
 dfw <- df[df$mode=="weight",]
 ps <- lapply(split(dfw, dfw$test), \(fd) {
   ggplot(fd, aes(effect, rank, col=peakWeight)) +
-    geom_line(stat = "identity", alpha=0.8, aes(group=peakWeight)) +
-    geom_point(stat = "identity", alpha=0.8, size = 1) +
+    geom_line(stat = "identity", alpha=0.6, aes(group=peakWeight)) +
+    geom_point(stat = "identity", alpha=0.6, aes(size = significance)) +
     geom_label_repel(aes(label = rank)) +
     facet_grid(smooth~dif, scales = "free") + 
     theme_bw() +

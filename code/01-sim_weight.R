@@ -2,17 +2,12 @@ suppressPackageStartupMessages({
   library(data.table)
   library(GenomicRanges)
   library(R.utils)
-  library(fields)
   library(SummarizedExperiment)
   source("~/chromVAR/R/getCounts.R")
   library(BSgenome.Hsapiens.UCSC.hg38)
-  library(BSgenome.Mmusculus.UCSC.mm10)
   library(rtracklayer)
-  library(edgeR)
-  library(limma)
-  library(dplyr)
+  library(fields)
 })
-
 
 # read wcs
 args <- R.utils::commandArgs(trailingOnly = TRUE, asValues=TRUE)
@@ -41,7 +36,7 @@ se <- getCounts(atacFrag = atacFrag,
     width = 300,
     smooth = smt[1],
     nGCBins = 10,
-    nWidthBins = 35,
+    nWidthBins = 30,
     aRange = aRange,
     peakWeight = pkw)
 

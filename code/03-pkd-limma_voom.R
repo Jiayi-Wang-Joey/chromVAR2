@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
 })
 
 fun <- function(x, genome, motif) {
+    x <- x[which(!is.infinite(rowSums(counts(x)))),]
     counts <- counts(x)
     group_id <- rep(LETTERS[1:2],each=ncol(counts)/2)
     design <- model.matrix(~ group_id)

@@ -14,8 +14,8 @@ ROW = ["peaks"] #"motifs"
 
 # smoother
 #SMT = ["none","smooth.2d_0.25", "smooth.2d_0.5,", "smooth.2d_0.75", "smooth.2d_1"]
-SMT = ["none", "smooth.2d_1"]
-PKW = ["none", "loess", "lm", "wlm"]
+SMT = ["none", "smooth.2d_2"]
+PKW = ["none", "loess"]
 # differential analysis methods
 DIF = glob_wildcards("code/02-dif-{x}.R").x
 PKD = glob_wildcards("code/03-pkd-{x}.R").x
@@ -45,7 +45,9 @@ sim_wgt = expand("/mnt/plger/jwang/data/sim/01-weight/weight-{mtf},{eft},{row}-{
 sim_dif = [
     expand("outs/sim/dif-total-{mtf},{eft}-{row},{dif}.rds", mtf=MTF, eft=EFT, row=ROW, dif=DIF),
     expand("outs/sim/dif-weight-{mtf},{eft}-{row}-{smt}-{pkw},{dif}.rds", mtf=MTF, eft=EFT, row=ROW, smt=SMT, pkw=PKW, dif=[x for x in DIF if "chromVAR" not in x])]
-
+sim_pkd = [
+    expand("outs/sim/pkd-total-{mtf},{eft}-{row},{pkd}.rds", mtf=MTF, eft=EFT, row=ROW, pkd=PKD),
+    expand("outs/sim/pkd-weight-{mtf},{eft}-{row}-{smt}-{pkw},{pkd}.rds", mtf=MTF, eft=EFT, row=ROW, smt=SMT, pkw=PKW, pkd=PKD)]
 
 dat_res = {
     "dat": dat,
@@ -59,7 +61,8 @@ sim_res = {
      "sim": sim,
      "ttl": sim_ttl,
      "wgt": sim_wgt,
-     "dif": sim_dif
+     "dif": sim_dif,
+     "pkd": sim_pkd
 }
 
 # visualization
@@ -78,7 +81,7 @@ for wal in WAL:
 # SETUP ========================================================================
 rule all: 
     input:
-        [x for x in dat_res.values()], plt,
+        #[x for x in dat_res.values()], plt,
         [x for x in sim_res.values()], qlt
 
 # real datasets
@@ -135,7 +138,7 @@ rule dif_wgt:
 
 rule pkd_ttl:
     priority: 96
-    input:  "code/03-pkd.R",
+    input:  "code/03-pkd_dat.R",
             "code/03-pkd-{pkd}.R",
             rules.dat_ttl.output
     output: "outs/dat/pkd-total-{mot}-{row},{pkd}.rds"
@@ -146,7 +149,7 @@ rule pkd_ttl:
 
 rule pkd_wgt:
     priority: 96
-    input:  "code/03-pkd.R",
+    input:  "code/03-pkd_dat.R",
             "code/03-pkd-{pkd}.R",
             rules.dat_wgt.output
     output: "outs/dat/pkd-weight-{mot}-{row}-{smt}-{pkw},{pkd}.rds"
@@ -197,17 +200,27 @@ rule dar_ttl:
         {R} CMD BATCH --no-restore --no-save "--args\
         mtf={wildcards.mtf} eft={wildcards.eft} row={wildcards.row} dif={wildcards.dif} fun={input[1]} res={output} dat={input[2]}" {input[0]} {log}'''
 
-rule dar_wgt:
-    priority: 97
-    input:  "code/02-dif_sim.R",
-            "code/02-dif-{dif}.R",
-            rules.sim_wgt.output
-    output: "outs/sim/dif-weight-{mtf},{eft}-{row}-{smt}-{pkw},{dif}.rds"
-    log:    "logs/sim_dif-weight-{mtf},{eft}-{row}-{smt}-{pkw},{dif}.rds.Rout"
+rule pek_ttl:
+    priority: 96
+    input:  "code/03-pkd_sim.R",
+            "code/03-pkd-{pkd}.R",
+            rules.sim_ttl.output
+    output: "outs/sim/pkd-total-{mtf},{eft}-{row},{pkd}.rds"
+    log:    "logs/sim_pkd-total-{mtf},{eft}-{row},{pkd}.rds.Rout"
     shell: '''
         {R} CMD BATCH --no-restore --no-save "--args\
-        mtf={wildcards.mtf} eft={wildcards.eft} row={wildcards.row} smt={wildcards.smt} pkw={wildcards.pkw} dif={wildcards.dif} fun={input[1]} res={output} dat={input[2]}" {input[0]} {log}'''
+        mtf={wildcards.mtf} eft={wildcards.eft} row={wildcards.row} pkd={wildcards.pkd} fun={input[1]} res={output} dat={input[2]}" {input[0]} {log}'''
 
+rule pek_wgt:
+    priority: 96
+    input:  "code/03-pkd_sim.R",
+            "code/03-pkd-{pkd}.R",
+            rules.sim_wgt.output
+    output: "outs/sim/pkd-weight-{mtf},{eft}-{row}-{smt}-{pkw},{pkd}.rds"
+    log:    "logs/sim_pkd-weight-{mtf},{eft},{row}-{smt}-{pkw},{pkd}.rds.Rout"
+    shell: '''
+        {R} CMD BATCH --no-restore --no-save "--args\
+        mtf={wildcards.mtf} eft={wildcards.eft} row={wildcards.row} smt={wildcards.smt} pkw={wildcards.pkw} fun={input[1]} pkd={wildcards.pkd} res={output} dat={input[2]}" {input[0]} {log}''' 
 
 
 

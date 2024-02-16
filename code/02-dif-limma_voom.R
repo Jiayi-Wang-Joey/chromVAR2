@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
 })
 
 fun <- function(x, genome, motif) {
+    x <- x[which(!is.infinite(rowSums(counts(x)))),]
     x <- filterPeaks(x, non_overlapping = TRUE)
     motif_ix <- matchMotifs(motif, x, genome = genome)
     y <- t(assay(motif_ix))%*%assay(x, "counts")
